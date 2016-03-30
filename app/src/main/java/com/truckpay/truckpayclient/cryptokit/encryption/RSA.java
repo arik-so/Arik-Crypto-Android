@@ -2,6 +2,10 @@ package com.truckpay.truckpayclient.cryptokit.encryption;
 
 import android.util.Base64;
 
+import org.spongycastle.asn1.ASN1Sequence;
+import org.spongycastle.asn1.pkcs.PrivateKeyInfo;
+import org.spongycastle.asn1.pkcs.RSAPrivateKeyStructure;
+
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
@@ -13,7 +17,9 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.InvalidPropertiesFormatException;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -48,16 +54,11 @@ public class RSA {
         keyGen.initialize(size);
         KeyPair keyPair = keyGen.generateKeyPair();
 
-        // disable the wrapping, because we need a custom wrapping
-        String encodedPrivateKey = Base64.encodeToString(keyPair.getPrivate().getEncoded(), Base64.NO_WRAP);
-        String encodedPublicKey = Base64.encodeToString(keyPair.getPublic().getEncoded(), Base64.NO_WRAP);
-
-        String wrappedPrivateKey = "-----BEGIN PRIVATE KEY-----\n" + wrap(encodedPrivateKey, 64) + "-----END PRIVATE KEY-----\n";
-        String wrappedPublicKey = "-----BEGIN PUBLIC KEY-----\n" + wrap(encodedPublicKey, 64) + "-----END PUBLIC KEY-----\n";
-
-        return new RSAKeyPair(wrappedPrivateKey, wrappedPublicKey);
+        return new RSAKeyPair(exportPrivateKey(keyPair.getPrivate()), exportPublicKey(keyPair.getPublic()));
 
     }
+
+
 
     public static String encryptWithPublic(String data, String publicKey) throws BadPaddingException, IllegalBlockSizeException, IOException, InvalidKeySpecException, InvalidKeyException {
 
@@ -87,6 +88,8 @@ public class RSA {
         // initialize
         byte[] encryptedByteData = Base64.decode(encryptedData, Base64.DEFAULT);
         PrivateKey keyObject = extractPrivateKey(privateKey);
+
+        String normalizedPrivateKey = exportPrivateKey(keyObject);
 
         // encrypt
         Cipher cipher = null; // create conversion processing object
@@ -167,7 +170,29 @@ public class RSA {
 
     }
 
-    private static PrivateKey extractPrivateKey(String privateKey) throws IOException, InvalidKeySpecException {
+    private static String exportPublicKey(PublicKey publicKey) {
+        String encodedPublicKey = Base64.encodeToString(publicKey.getEncoded(), Base64.NO_WRAP);
+        return "-----BEGIN PUBLIC KEY-----\n" + wrap(encodedPublicKey, 64) + "-----END PUBLIC KEY-----\n";
+    }
+
+    private static String exportPrivateKey(PrivateKey privateKey) {
+
+        try {
+            PrivateKeyInfo pki = PrivateKeyInfo.getInstance(privateKey.getEncoded());
+            RSAPrivateKeyStructure cryptographyStandard1PrivateKey = RSAPrivateKeyStructure.getInstance(pki.getPrivateKey());
+            byte[] cryptographyStandard1PrivateKeyBytes = cryptographyStandard1PrivateKey.getEncoded();
+
+            String encodedPrivateKey = Base64.encodeToString(cryptographyStandard1PrivateKeyBytes, Base64.NO_WRAP);
+            String legacyPrivateKeyFormat = "-----BEGIN PRIVATE KEY-----\n" + wrap(encodedPrivateKey, 64) + "-----END PRIVATE KEY-----\n";
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        String encodedPrivateKey = Base64.encodeToString(privateKey.getEncoded(), Base64.NO_WRAP);
+        return "-----BEGIN PRIVATE KEY-----\n" + wrap(encodedPrivateKey, 64) + "-----END PRIVATE KEY-----\n";
+    }
+
+    private static PrivateKey extractPrivateKey(String privateKey) throws InvalidKeySpecException, IOException {
 
         byte[] privateKeyBytes = normalizeKey(privateKey);
 
@@ -182,7 +207,29 @@ public class RSA {
             return null; // should never happen
         }
 
-        return kf.generatePrivate(new PKCS8EncodedKeySpec(privateKeyBytes));
+        PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(privateKeyBytes);
+
+        RSAPrivateKeyStructure asn1PrivKey = new RSAPrivateKeyStructure((ASN1Sequence) ASN1Sequence.fromByteArray(privateKeyBytes));
+        RSAPrivateKeySpec rsaPrivKeySpec = new RSAPrivateKeySpec(asn1PrivKey.getModulus(), asn1PrivKey.getPrivateExponent());
+
+        PrivateKey key = null;
+        InvalidKeySpecException exception = null;
+
+        try {
+            key = kf.generatePrivate(pkcs8KeySpec);
+            return key;
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            key = kf.generatePrivate(rsaPrivKeySpec);
+            return key;
+        } catch (InvalidKeySpecException e) {
+            exception = e;
+        }
+
+        throw exception;
 
     }
 
@@ -192,7 +239,7 @@ public class RSA {
     }
 
     public static String filter(String input){
-        return input.replaceAll("-----[a-zA-Z ]*-----", "").replaceAll("\n", "");
+        return input.replaceAll("-----[a-zA-Z ]*-----", "").replaceAll("\n", "").replaceAll("\r", "");
     }
 
     private static String wrap(String string, int length){

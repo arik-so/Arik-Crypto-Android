@@ -2,7 +2,7 @@ package com.truckpay.truckpayclient.cryptokit.encryption;
 
 import android.util.Base64;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -105,7 +105,7 @@ public class AES {
         cipher.init(Cipher.DECRYPT_MODE, aesKeySpec, ivSpec);
         byte[] original = cipher.doFinal(rawData);
 
-        return new String(original, Charset.forName("UTF-8"));
+        return new String(original, StandardCharsets.US_ASCII);
 
     }
 
