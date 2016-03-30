@@ -81,6 +81,7 @@ public class AuthenticationTest extends InstrumentationTestCase {
         String requestHashInput = timestamp + '|' + token + '|';
         String requestHash = Hashing.sha256(requestHashInput);
         String requestSignature = RSA.encryptWithPrivate(requestHash, privateKey)
+        // default base64 encoding produces line breaks, but HTTP headers must not have them
         .replaceAll("\r", "").replaceAll("\n", "");
 
         JSONObject headers = new JSONObject();
