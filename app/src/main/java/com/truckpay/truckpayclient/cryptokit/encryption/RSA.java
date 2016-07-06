@@ -196,9 +196,6 @@ public class RSA {
 
         byte[] privateKeyBytes = normalizeKey(privateKey);
 
-        // RSAPrivateKeyStructure asn1PrivKey = new RSAPrivateKeyStructure((ASN1Sequence) ASN1Sequence.fromByteArray(privateKeyBytes));
-        // RSAPrivateKeySpec rsaPrivKeySpec = new RSAPrivateKeySpec(asn1PrivKey.getModulus(), asn1PrivKey.getPrivateExponent());
-
         KeyFactory kf = null;
         try {
             kf = KeyFactory.getInstance(ALGORITHM);
@@ -208,9 +205,6 @@ public class RSA {
         }
 
         PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(privateKeyBytes);
-
-        RSAPrivateKeyStructure asn1PrivKey = new RSAPrivateKeyStructure((ASN1Sequence) ASN1Sequence.fromByteArray(privateKeyBytes));
-        RSAPrivateKeySpec rsaPrivKeySpec = new RSAPrivateKeySpec(asn1PrivKey.getModulus(), asn1PrivKey.getPrivateExponent());
 
         PrivateKey key = null;
         InvalidKeySpecException exception = null;
@@ -223,6 +217,8 @@ public class RSA {
         }
 
         try {
+            RSAPrivateKeyStructure asn1PrivKey = new RSAPrivateKeyStructure((ASN1Sequence) ASN1Sequence.fromByteArray(privateKeyBytes));
+            RSAPrivateKeySpec rsaPrivKeySpec = new RSAPrivateKeySpec(asn1PrivKey.getModulus(), asn1PrivKey.getPrivateExponent());
             key = kf.generatePrivate(rsaPrivKeySpec);
             return key;
         } catch (InvalidKeySpecException e) {
